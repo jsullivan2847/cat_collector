@@ -1,1 +1,1 @@
-web: gunicorn catcollector.wsgis
+web: gunicorn catcollector.wsgi
