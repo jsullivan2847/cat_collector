@@ -2,11 +2,16 @@ from django.shortcuts import render, redirect
 from django.views.generic.edit import CreateView, UpdateView, DeleteView
 from django.views.generic import ListView
 from django.views.generic.detail import DetailView
+from django.contrib.auth import login
+from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
 from .models import Cat, Toy, Photo
 from .forms import FeedingForm
+
 import uuid, boto3
 
-S3_BASE_URL = 'https://s3-us-east-1.amazonaws.com/'
+S3_BASE_URL = 'https://s3.us-east-1.amazonaws.com/'
 BUCKET = 'django-cat-collector-2847'
 
 
@@ -16,10 +21,12 @@ def home(request):
 def about(request):
   return render(request, 'about.html')
 
+@login_required
 def cats_index(request):
-  cats = Cat.objects.all()
+  cats = Cat.objects.filter(user = request.user)
   return render(request, 'cats/index.html', { 'cats': cats })
 
+@login_required
 def cats_detail(request, cat_id):
   cat = Cat.objects.get(id=cat_id)
   feeding_form = FeedingForm()
@@ -30,6 +37,12 @@ def cats_detail(request, cat_id):
     'toys': toys_cat_doesnt_have
   })
 
+@login_required
+def assoc_toy(request, cat_id, toy_id):
+  Cat.objects.get(id = cat_id).toys.add(toy_id)
+  return redirect('detail', cat_id=cat_id)
+
+@login_required
 def add_feeding(request, cat_id):
   # create the ModelForm using the data in request.POST
   form = FeedingForm(request.POST)
@@ -42,6 +55,7 @@ def add_feeding(request, cat_id):
     new_feeding.save()
   return redirect('detail', cat_id=cat_id)
 
+@login_required
 def add_photo(request, cat_id):
   # attempt to collect the photo file data
   photo_file = request.FILES.get('photo-file', None)
@@ -64,53 +78,61 @@ def add_photo(request, cat_id):
     #print an error message
     except Exception as error:
       print("Error uploading photo", error)
-  else:
-    return redirect('detail', cat_id = cat_id)
-    
-      
-      
-   
-
   
+  return redirect('detail', cat_id = cat_id)
+    
+def signup(request):
+  error_message = ''
+  if request.method == 'POST':
+    form = UserCreationForm(request.POST)
+    if form.is_valid():
+      user = form.save()
+      login(request,user)
+      return redirect('index')
+    else:
+      error_message = 'Invalid sign up - try again'
+  form = UserCreationForm()
+  context = {'form': form, 'error_message': error_message}
+  return render(request, 'registration/signup.html', context)
 
-
-class CatCreate(CreateView):
+class CatCreate(LoginRequiredMixin, CreateView):
   model = Cat
-  fields = '__all__'
+  fields = ['name', 'breed', 'description', 'age']
   success_url = '/cats/'
+  def form_valid(self, form):
+    form.instance.user = self.request.user
+    return super().form_valid(form)
 
-class CatUpdate(UpdateView):
+class CatUpdate(LoginRequiredMixin, UpdateView):
   model = Cat
   # Let's disallow the renaming of a cat by excluding the name field!
   fields = ['breed', 'description', 'age']
 
-class CatDelete(DeleteView):
+class CatDelete(LoginRequiredMixin, DeleteView):
   model = Cat
   success_url = '/cats/'
 
-class ToyList(ListView):
+class ToyList(LoginRequiredMixin, ListView):
   model = Toy
   template_name = 'toys/index.html'
 
-class ToyDetail(DetailView):
+class ToyDetail(LoginRequiredMixin, DetailView):
   model = Toy
   template_name = 'toys/detail.html'
 
-class ToyCreate(CreateView):
+class ToyCreate(LoginRequiredMixin, CreateView):
     model = Toy
     fields = ['name', 'color']
 
 
-class ToyUpdate(UpdateView):
+class ToyUpdate(LoginRequiredMixin, UpdateView):
     model = Toy
     fields = ['name', 'color']
 
 
-class ToyDelete(DeleteView):
+class ToyDelete(LoginRequiredMixin, DeleteView):
     model = Toy
     success_url = '/toys/'
 
-def assoc_toy(request, cat_id, toy_id):
-  Cat.objects.get(id = cat_id).toys.add(toy_id)
-  return redirect('detail', cat_id=cat_id)
+
 

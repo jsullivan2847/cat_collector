@@ -19,5 +19,7 @@ urlpatterns = [
     path('toys/<int:pk>/update/', views.ToyUpdate.as_view(), name='toys_update'),
     path('toys/<int:pk>/delete/', views.ToyDelete.as_view(), name='toys_delete'),
     #photos
-    path('cats/<int:pk>/add_photo/', views.add_photo, name='add_photo'),
+    path('cats/<int:cat_id>/add_photo/', views.add_photo, name='add_photo'),
+    #registration
+    path('accounts/signup/', views.signup, name='signup')
 ]
